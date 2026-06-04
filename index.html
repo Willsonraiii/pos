@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MartPOS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background: #0a0a0a; color: white; font-family: system-ui; }
+        .glass { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(10px); }
+        .product-card { transition: all 0.2s; }
+        .product-card:hover { transform: scale(1.02); background: rgba(255,255,255,0.08); }
+        .btn-primary { background: linear-gradient(135deg, #10b981, #0d9488); }
+        .btn-primary:hover { opacity: 0.9; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- LOGIN SCREEN -->
+    <div id="login" class="flex items-center justify-center min-h-screen">
+        <div class="glass rounded-3xl p-8 w-full max-w-md">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <span class="text-2xl">🛒</span>
+                </div>
+                <h1 class="text-2xl font-bold">MartPOS</h1>
+                <p class="text-gray-400 text-sm">Select user and enter PIN</p>
+            </div>
+            <div id="user-grid" class="grid grid-cols-2 gap-3"></div>
+            <div id="pin-pad" class="hidden">
+                <div class="flex items-center gap-3 mb-6 p-3 rounded-xl bg-gray-800/50">
+                    <div id="selected-user-avatar" class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center font-bold">A</div>
+                    <div>
+                        <p id="selected-user-name" class="font-medium">Admin</p>
+                        <p class="text-xs text-gray-400 capitalize">admin</p>
+                    </div>
+                    <button onclick="backToUsers()" class="ml-auto text-gray-400">✕</button>
+                </div>
+                <div class="flex justify-center gap-3 mb-6">
+                    <div class="w-4 h-4 rounded-full bg-gray-700 pin-dot"></div>
+                    <div class="w-4 h-4 rounded-full bg-gray-700 pin-dot"></div>
+                    <div class="w-4 h-4 rounded-full bg-gray-700 pin-dot"></div>
+                    <div class="w-4 h-4 rounded-full bg-gray-700 pin-dot"></div>
+                </div>
+                <div class="grid grid-cols-3 gap-2" id="numpad"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="app" class="hidden">
+        <!-- HEADER -->
+        <header class="glass sticky top-0 z-40 border-b border-gray-800">
+            <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl flex items-center justify-center">🛒</div>
+                    <div>
+                        <h1 class="font-bold text-lg">MartPOS</h1>
+                        <p class="text-xs text-gray-400">Premium Point of Sale</p>
+                    </div>
+                </div>
+                <nav class="flex gap-1">
+                    <button onclick="showTab('pos')" class="tab-btn px-4 py-2 rounded-xl text-sm font-medium bg-emerald-500/10 text-emerald-500">POS</button>
+                    <button onclick="showTab('products')" class="tab-btn px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:bg-gray-800">Products</button>
+                    <button onclick="showTab('orders')" class="tab-btn px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:bg-gray-800">Orders</button>
+                    <button onclick="showTab('reports')" class="tab-btn px-4 py-2 rounded-xl text-sm font-medium text-gray-400 hover:bg-gray-800">Reports</button>
+                </nav>
+                <button onclick="logout()" class="p-2 rounded-xl hover:bg-red-500/10 text-red-400 transition-colors">🚪</button>
+            </div>
+        </header>
+
+        <!-- POS TAB -->
+        <div id="tab-pos" class="max-w-7xl mx-auto p-4">
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                <!-- PRODUCTS -->
+                <div class="lg:col-span-8 space-y-4">
+                    <div class="glass rounded-2xl p-4">
+                        <div class="flex gap-3">
+                            <div class="relative flex-1">
+                                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                                <input type="text" id="search" placeholder="Search products..." oninput="filterProducts()" 
+                                    class="w-full pl-10 pr-4 py-3 rounded-xl text-sm bg-gray-800 border border-gray-700 text-white outline-none focus:border-emerald-500">
+                            </div>
+                            <button onclick="toggleBarcode()" class="px-4 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-medium">📷 Scan</button>
+                        </div>
+                        <div class="flex gap-2 mt-3 overflow-x-auto pb-1" id="categories"></div>
+                    </div>
+                    <div class="glass rounded-2xl overflow-hidden">
+                        <div class="p-4 border-b border-gray-800 flex justify-between">
+                            <p class="text-sm text-gray-400" id="product-count">24 products</p>
+                        </div>
+                        <div class="p-4 overflow-y-auto max-h-[600px]">
+                            <div id="product-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CART -->
+                <div class="lg:col-span-4">
+                    <div class="glass rounded-2xl flex flex-col overflow-hidden" style="max-height: calc(100vh - 120px);">
+                        <div class="p-4 border-b border-gray-800">
+                            <h2 class="font-bold text-lg flex items-center gap-2">🛒 Current Order</h2>
+                            <input type="text" id="customer" placeholder="Customer name (optional)" 
+                                class="w-full mt-2 px-3 py-2 rounded-lg text-sm bg-gray-800 border border-gray-700 text-white outline-none">
+                        </div>
+                        <div class="flex-1 overflow-y-auto p-4 space-y-2" id="cart-items">
+                            <div class="text-center py-12 text-gray-500">
+                                <p class="text-4xl mb-3">🛒</p>
+                                <p>Cart is empty</p>
+                                <p class="text-xs mt-1 text-gray-600">Click products to add</p>
+                            </div>
+                        </div>
+                        <div class="p-4 border-t border-gray-800 space-y-2">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-400">Items</span>
+                                <span id="item-count">0</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-400">Subtotal</span>
+                                <span id="subtotal">$0.00</span>
+                            </div>
+                            <div class="flex justify-between text-sm">
+                                <span class="text-gray-400">Tax</span>
+                                <span id="tax">$0.00</span>
+                            </div>
+                            <div class="flex justify-between items-center pt-2 border-t border-dashed border-gray-700">
+                                <span class="font-bold text-lg">Total</span>
+                                <span class="font-bold text-2xl text-emerald-500" id="total">$0.00</span>
+                            </div>
+                            <button onclick="showPayment()" id="pay-btn" disabled 
+                                class="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-bold text-lg shadow-lg opacity-50 cursor-not-allowed">
+                                💳 Pay $0.00
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PRODUCTS TAB -->
+        <div id="tab-products" class="hidden max-w-7xl mx-auto p-4">
+            <div class="glass rounded-2xl p-4 mb-4">
+                <div class="flex justify-between items-center">
+                    <h2 class="font-bold text-xl">Products</h2>
+                    <button onclick="showAddProduct()" class="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-medium">➕ Add</button>
+                </div>
+            </div>
+            <div class="glass rounded-2xl overflow-hidden">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-gray-800">
+                            <th class="text-left p-4 text-sm font-medium text-gray-400">Product</th>
+                            <th class="text-left p-4 text-sm font-medium text-gray-400">Price</th>
+                            <th class="text-left p-4 text-sm font-medium text-gray-400">Stock</th>
+                            <th class="text-left p-4 text-sm font-medium text-gray-400">Category</th>
+                        </tr>
+                    </thead>
+                    <tbody id="product-table"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- ORDERS TAB -->
+        <div id="tab-orders" class="hidden max-w-7xl mx-auto p-4">
+            <div class="glass rounded-2xl p-4 mb-4">
+                <h2 class="font-bold text-xl">Orders</h2>
+            </div>
+            <div class="glass rounded-2xl overflow-hidden">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-gray-800">
+                            <th class="text-left p-4 text-sm font-medium text-gray-400">Order</th>
+                            <th class="text-left p-4 text-sm font-medium text-gray-400">Date</th>
+                            <th class="text-right p-4 text-sm font-medium text-gray-400">Total</th>
+                            <th class="text-left p-4 text-sm font-medium text-gray-400">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orders-table"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- REPORTS TAB -->
+        <div id="tab-reports" class="hidden max-w-7xl mx-auto p-4">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div class="glass rounded-2xl p-5">
+                    <p class="text-sm text-gray-400 mb-1">Total Sales</p>
+                    <p class="text-2xl font-bold" id="report-sales">$0.00</p>
+                </div>
+                <div class="glass rounded-2xl p-5">
+                    <p class="text-sm text-gray-400 mb-1">Orders</p>
+                    <p class="text-2xl font-bold" id="report-orders">0</p>
+                </div>
+                <div class="glass rounded-2xl p-5">
+                    <p class="text-sm text-gray-400 mb-1">Items Sold</p>
+                    <p class="text-2xl font-bold" id="report-items">0</p>
+                </div>
+                <div class="glass rounded-2xl p-5">
+                    <p class="text-sm text-gray-400 mb-1">Avg Order</p>
+                    <p class="text-2xl font-bold" id="report-avg">$0.00</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAYMENT MODAL -->
+    <div id="payment-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="glass rounded-3xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="font-bold text-lg">💳 Payment</h2>
+                <button onclick="closePayment()" class="p-2 hover:bg-gray-800 rounded-lg">✕</button>
+            </div>
+            <div class="text-center p-4 rounded-2xl bg-gray-800/50 mb-4">
+                <p class="text-sm text-gray-400 mb-1">Total</p>
+                <p class="text-3xl font-bold text-emerald-500" id="pay-total">$0.00</p>
+            </div>
+            <div class="grid grid-cols-3 gap-2 mb-4">
+                <button onclick="setPayMethod('cash')" class="pay-method p-3 rounded-xl border-2 border-emerald-500 bg-emerald-500/10 text-emerald-500 text-center">💵<<br>Cash</button>
+                <button onclick="setPayMethod('card')" class="pay-method p-3 rounded-xl border-2 border-gray-700 text-gray-400 text-center">💳<<br>Card</button>
+                <button onclick="setPayMethod('digital')" class="pay-method p-3 rounded-xl border-2 border-gray-700 text-gray-400 text-center">📱<<br>Digital</button>
+            </div>
+            <input type="number" id="pay-amount" placeholder="0.00" class="w-full px-4 py-3 rounded-xl text-lg font-bold bg-gray-800 border border-gray-700 text-white outline-none mb-2">
+            <div class="flex gap-2 mb-4">
+                <button onclick="quickPay(5)" class="flex-1 py-2 rounded-lg bg-gray-800 text-sm">$5</button>
+                <button onclick="quickPay(10)" class="flex-1 py-2 rounded-lg bg-gray-800 text-sm">$10</button>
+                <button onclick="quickPay(20)" class="flex-1 py-2 rounded-lg bg-gray-800 text-sm">$20</button>
+                <button onclick="quickPayExact()" class="flex-1 py-2 rounded-lg bg-emerald-500/10 text-emerald-500 text-sm">Exact</button>
+            </div>
+            <button onclick="completePayment()" class="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-bold text-lg">✓ Complete Payment</button>
+        </div>
+    </div>
+
+    <!-- RECEIPT MODAL -->
+    <div id="receipt-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div class="glass rounded-3xl w-full max-w-md p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="font-bold text-lg">🧾 Receipt</h2>
+                <button onclick="closeReceipt()" class="p-2 hover:bg-gray-800 rounded-lg">✕</button>
+            </div>
+            <div id="receipt-content" class="space-y-4"></div>
+            <button onclick="closeReceipt()" class="w-full mt-4 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl font-medium">Close & New Order</button>
+        </div>
+    </div>
+
+    <script>
+        // DATA
+        const USERS = [
+            { id: '1', name: 'Admin User', role: 'admin', pin: '0000', initial: 'A' },
+            { id: '2', name: 'Manager One', role: 'manager', pin: '1111', initial: 'M' },
+            { id: '3', name: 'Cashier Jane', role: 'cashier', pin: '2222', initial: 'J' },
+            { id: '4', name: 'Cashier Mike', role: 'cashier', pin: '3333', initial: 'M' },
+        ];
+
+        const CATEGORIES = [
+            { id: 'all', name: 'All', color: '#10b981' },
+            { id: 'beverages', name: 'Beverages', color: '#3b82f6' },
+            { id: 'snacks', name: 'Snacks', color: '#f59e0b' },
+            { id: 'dairy', name: 'Dairy', color: '#8b5cf6' },
+            { id: 'produce', name: 'Produce', color: '#22c55e' },
+            { id: 'frozen', name: 'Frozen', color: '#06b6d4' },
+            { id: 'household', name: 'Household', color: '#ef4444' },
+            { id: 'personal', name: 'Personal', color: '#ec4899' },
+        ];
+
+        let PRODUCTS = JSON.parse(localStorage.getItem('pos_products')) || [
+            { id: '1', barcode: '123456789012', name: 'Organic Matcha Latte', price: 5.99, category: 'beverages', stock: 45, taxRate: 0.08 },
+            { id: '2', barcode: '123456789013', name: 'Sparkling Water', price: 2.49, category: 'beverages', stock: 120, taxRate: 0.08 },
+            { id: '3', barcode: '123456789014', name: 'Cold Brew Coffee', price: 4.99, category: 'beverages', stock: 30, taxRate: 0.08 },
+            { id: '4', barcode: '123456789015', name: 'Artisan Kombucha', price: 3.99, category: 'beverages', stock: 25, taxRate: 0.08 },
+            { id: '5', barcode: '123456789016', name: 'Premium Green Tea', price: 6.99, category: 'beverages', stock: 18, taxRate: 0.08 },
+            { id: '6', barcode: '123456789017', name: 'Gourmet Popcorn', price: 3.49, category: 'snacks', stock: 60, taxRate: 0.08 },
+            { id: '7', barcode: '123456789018', name: 'Dark Chocolate Bar', price: 4.99, category: 'snacks', stock: 40, taxRate: 0.08 },
+            { id: '8', barcode: '123456789019', name: 'Mixed Nuts', price: 7.99, category: 'snacks', stock: 35, taxRate: 0.08 },
+            { id: '9', barcode: '123456789020', name: 'Protein Chips', price: 3.99, category: 'snacks', stock: 50, taxRate: 0.08 },
+            { id: '10', barcode: '123456789021', name: 'Organic Almond Milk', price: 4.49, category: 'dairy', stock: 28, taxRate: 0.08 },
+            { id: '11', barcode: '123456789022', name: 'Greek Yogurt', price: 2.99, category: 'dairy', stock: 42, taxRate: 0.08 },
+            { id: '12', barcode: '123456789023', name: 'Aged Cheddar', price: 8.99, category: 'dairy', stock: 15, taxRate: 0.08 },
+            { id: '13', barcode: '123456789024', name: 'Fresh Avocados', price: 1.99, category: 'produce', stock: 55, taxRate: 0 },
+            { id: '14', barcode: '123456789025', name: 'Organic Bananas', price: 0.99, category: 'produce', stock: 80, taxRate: 0 },
+            { id: '15', barcode: '123456789026', name: 'Baby Spinach', price: 3.99, category: 'produce', stock: 22, taxRate: 0 },
+            { id: '16', barcode: '123456789027', name: 'Frozen Pizza', price: 8.99, category: 'frozen', stock: 20, taxRate: 0.08 },
+            { id: '17', barcode: '123456789028', name: 'Ice Cream', price: 6.99, category: 'frozen', stock: 16, taxRate: 0.08 },
+            { id: '18', barcode: '123456789029', name: 'Frozen Berries', price: 5.99, category: 'frozen', stock: 24, taxRate: 0.08 },
+            { id: '19', barcode: '123456789030', name: 'Dish Soap', price: 3.99, category: 'household', stock: 40, taxRate: 0.08 },
+            { id: '20', barcode: '123456789031', name: 'Paper Towels', price: 5.99, category: 'household', stock: 30, taxRate: 0.08 },
+            { id: '21', barcode: '123456789032', name: 'Laundry Detergent', price: 12.99, category: 'household', stock: 18, taxRate: 0.08 },
+            { id: '22', barcode: '123456789033', name: 'Shampoo', price: 7.99, category: 'personal', stock: 25, taxRate: 0.08 },
+            { id: '23', barcode: '123456789034', name: 'Face Moisturizer', price: 15.99, category: 'personal', stock: 12, taxRate: 0.08 },
+            { id: '24', barcode: '123456789035', name: 'Toothpaste', price: 4.99, category: 'personal', stock: 38, taxRate: 0.08 },
+        ];
+
+        let ORDERS = JSON.parse(localStorage.getItem('pos_orders')) || [];
+        let cart = [];
+        let currentUser = null;
+        let selectedCategory = 'all';
+        let payMethod = 'cash';
+
+        // LOGIN
+        function renderUsers() {
+            const grid = document.getElementById('user-grid');
+            grid.innerHTML = USERS.map(u => `
+                <button onclick="selectUser('${u.id}')" class="p-4 rounded-2xl border-2 border-gray-800 hover:border-emerald-500/50 bg-gray-800/50 transition-all hover:scale-105">
+                    <div class="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-lg font-bold text-white mx-auto mb-2">${u.initial}</div>
+                    <p class="font-medium text-sm">${u.name}</p>
+                    <p class="text-xs text-gray-400 capitalize">${u.role}</p>
+                </button>
+            `).join('');
+        }
+
+        function selectUser(id) {
+            const user = USERS.find(u => u.id === id);
+            currentUser = user;
+            document.getElementById('user-grid').classList.add('hidden');
+            document.getElementById('pin-pad').classList.remove('hidden');
+            document.getElementById('selected-user-name').textContent = user.name;
+            document.getElementById('selected-user-avatar').textContent = user.initial;
+            renderNumpad();
+        }
+
+        function backToUsers() {
+            document.getElementById('user-grid').classList.remove('hidden');
+            document.getElementById('pin-pad').classList.add('hidden');
+            resetPin();
+        }
+
+        let pin = '';
+        function renderNumpad() {
+            const keys = ['1','2','3','4','5','6','7','8','9','clear','0','enter'];
+            document.getElementById('numpad').innerHTML = keys.map(k => {
+                if (k === 'clear') return `<button onclick="pinKey('clear')" class="h-14 rounded-xl bg-red-500/10 text-red-400 hover:bg-red-500/20 font-semibold">✕</button>`;
+                if (k === 'enter') return `<button onclick="pinKey('enter')" class="h-14 rounded-xl bg-emerald-500 text-white hover:bg-emerald-600 font-semibold">✓</button>`;
+                return `<button onclick="pinKey('${k}')" class="h-14 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-semibold">${k}</button>`;
+            }).join('');
+        }
+
+        function pinKey(key) {
+            const dots = document.querySelectorAll('.pin-dot');
+            if (key === 'clear') {
+                pin = '';
+            } else if (key === 'enter') {
+                if (pin === currentUser.pin) {
+                    document.getElementById('login').classList.add('hidden');
+                    document.getElementById('app').classList.remove('hidden');
+                    initApp();
+                } else {
+                    pin = '';
+                    alert('Wrong PIN!');
+                }
+            } else if (pin.length < 4) {
+                pin += key;
+            }
+            dots.forEach((d, i) => d.style.backgroundColor = i < pin.length ? '#10b981' : '#374151');
+        }
+
+        function resetPin() {
+            pin = '';
+            document.querySelectorAll('.pin-dot').forEach(d => d.style.backgroundColor = '#374151');
+        }
+
+        function logout() {
+            currentUser = null;
+            cart = [];
+            document.getElementById('app').classList.add('hidden');
+            document.getElementById('login').classList.remove('hidden');
+            backToUsers();
+        }
+
+        // APP
+        function initApp() {
+            renderCategories();
+            renderProducts();
+            renderProductTable();
+            renderOrders();
+            renderReports();
+        }
+
+        function renderCategories() {
+            document.getElementById('categories').innerHTML = CATEGORIES.map(c => `
+                <button onclick="setCategory('${c.id}')" class="px-4 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${selectedCategory === c.id ? 'text-white shadow-lg' : 'bg-gray-800 text-gray-300'}"
+                    style="${selectedCategory === c.id ? `background-color:${c.color};box-shadow:0 4px 20px ${c.color}40` : ''}">${c.name}</button>
+            `).join('');
+        }
+
+        function setCategory(id) {
+            selectedCategory = id;
+            renderCategories();
+            renderProducts();
+        }
+
+        function filterProducts() {
+            renderProducts();
+        }
+
+        function renderProducts() {
+            const search = document.getElementById('search').value.toLowerCase();
+            const filtered = PRODUCTS.filter(p => {
+                const matchCat = selectedCategory === 'all' || p.category === selectedCategory;
+                const matchSearch = p.name.toLowerCase().includes(search) || p.barcode.includes(search);
+                return matchCat && matchSearch;
+            });
+            
+            document.getElementById('product-count').textContent = `${filtered.length} products`;
+            document.getElementById('product-grid').innerHTML = filtered.map(p => {
+                const cat = CATEGORIES.find(c => c.id === p.category);
+                return `
+                    <button onclick="addToCart('${p.id}')" class="product-card relative p-4 rounded-2xl text-left bg-gray-800/50 border border-gray-700/50 hover:border-gray-600 ${p.stock <= 0 ? 'opacity-50 cursor-not-allowed' : ''}" ${p.stock <= 0 ? 'disabled' : ''}>
+                        ${p.stock <= 10 && p.stock > 0 ? '<div class="absolute top-2 right-2 w-2 h-2 bg-amber-500 rounded-full"></div>' : ''}
+                        <div class="w-12 h-12 rounded-xl mb-3 flex items-center justify-center text-2xl font-bold" style="background-color:${cat.color}20;color:${cat.color}">${p.name[0]}</div>
+                        <p class="font-medium text-sm leading-tight mb-1">${p.name}</p>
+                        <p class="text-emerald-500 font-bold">$${p.price.toFixed(2)}</p>
+                        <p class="text-xs text-gray-500 mt-1">Stock: ${p.stock}</p>
+                    </button>
+                `;
+            }).join('');
+        }
+
+        function addToCart(id) {
+            const product = PRODUCTS.find(p => p.id === id);
+            if (!product || product.stock <= 0) return;
+            
+            const existing = cart.find(item => item.id === id);
+            if (existing) {
+                if (existing.quantity >= product.stock) return;
+                existing.quantity++;
+                existing.total = existing.quantity * product.price;
+            } else {
+                cart.push({ ...product, quantity: 1, total: product.price });
+            }
+            renderCart();
+        }
+
+        function updateQty(id, delta) {
+            const item = cart.find(i => i.id === id);
+            if (!item) return;
+            const product = PRODUCTS.find(p => p.id === id);
+            const newQty = item.quantity + delta;
+            if (newQty < 1) {
+                cart = cart.filter(i => i.id !== id);
+            } else if (product && newQty > product.stock) {
+                return;
+            } else {
+                item.quantity = newQty;
+                item.total = newQty * item.price;
+            }
+            renderCart();
+        }
+
+        function removeFromCart(id) {
+            cart = cart.filter(i => i.id !== id);
+            renderCart();
+        }
+
+        function renderCart() {
+            const container = document.getElementById('cart-items');
+            if (cart.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12 text-gray-500">
+                        <p class="text-4xl mb-3">🛒</p>
+                        <p>Cart is empty</p>
+                        <p class="text-xs mt-1 text-gray-600">Click products to add</p>
+                    </div>`;
+            } else {
+                container.innerHTML = cart.map(item => `
+                    <div class="p-3 rounded-xl bg-gray-800/50 border border-gray-700/50">
+                        <div class="flex justify-between mb-2">
+                            <div>
+                                <p class="font-medium text-sm">${item.name}</p>
+                                <p class="text-xs text-gray-500">$${item.price.toFixed(2)} each</p>
+                            </div>
+                            <p class="font-bold">$${item.total.toFixed(2)}</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="updateQty('${item.id}', -1)" class="w-8 h-8 rounded-lg bg-gray-700 hover:bg-gray-600 flex items-center justify-center">−</button>
+                            <span class="w-8 text-center font-medium">${item.quantity}</span>
+                            <button onclick="updateQty('${item.id}', 1)" class="w-8 h-8 rounded-lg bg-gray-700 hover:bg-gray-600 flex items-center justify-center">+</button>
+                            <button onclick="removeFromCart('${item.id}')" class="ml-auto w-8 h-8 rounded-lg text-red-400 hover:bg-red-500/10 flex items-center justify-center">🗑</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            const subtotal = cart.reduce((s, i) => s + i.total, 0);
+            const tax = cart.reduce((s, i) => s + i.total * i.taxRate, 0);
+            const total = subtotal + tax;
+            const count = cart.reduce((s, i) => s + i.quantity, 0);
+            
+            document.getElementById('item-count').textContent = count;
+            document.getElementById('subtotal').textContent = `$${subtotal.toFixed(2)}`;
+            document.getElementById('tax').textContent = `$${tax.toFixed(2)}`;
+            document.getElementById('total').textContent = `$${total.toFixed(2)}`;
+            
+            const payBtn = document.getElementById('pay-btn');
+            payBtn.textContent = `💳 Pay $${total.toFixed(2)}`;
+            payBtn.disabled = cart.length === 0;
+            payBtn.classList.toggle('opacity-50', cart.length === 0);
+            payBtn.classList.toggle('cursor-not-allowed', cart.length === 0);
+        }
+
+        // PAYMENT
+        function showPayment() {
+            const total = cart.reduce((s, i) => s + i.total + i.total * i.taxRate, 0);
+            document.getElementById('pay-total').textContent = `$${total.toFixed(2)}`;
+            document.getElementById('payment-modal').classList.remove('hidden');
+        }
+
+        function closePayment() {
+            document.getElementById('payment-modal').classList.add('hidden');
+        }
+
+        function setPayMethod(method) {
+            payMethod = method;
+            document.querySelectorAll('.pay-method').forEach(b => {
+                b.classList.remove('border-emerald-500', 'bg-emerald-500/10', 'text-emerald-500');
+                b.classList.add('border-gray-700', 'text-gray-400');
+            });
+            event.target.closest('.pay-method').classList.remove('border-gray-700', 'text-gray-400');
+            event.target.closest('.pay-method').classList.add('border-emerald-500', 'bg-emerald-500/10', 'text-emerald-500');
+        }
+
+        function quickPay(amt) {
+            document.getElementById('pay-amount').value = amt;
+        }
+
+        function quickPayExact() {
+            const total = cart.reduce((s, i) => s + i.total + i.total * i.taxRate, 0);
+            document.getElementById('pay-amount').value = total.toFixed(2);
+        }
+
+        function completePayment() {
+            const amount = parseFloat(document.getElementById('pay-amount').value) || 0;
+            const total = cart.reduce((s, i) => s + i.total + i.total * i.taxRate, 0);
+            
+            if (amount < total) {
+                alert('Not enough payment!');
+                return;
+            }
+            
+            const order = {
+                id: Math.random().toString(36).substr(2, 9).toUpperCase(),
+                items: [...cart],
+                subtotal: cart.reduce((s, i) => s + i.total, 0),
+                tax: cart.reduce((s, i) => s + i.total * i.taxRate, 0),
+                total: total,
+                change: amount - total,
+                timestamp: new Date().toISOString(),
+                cashier: currentUser.name,
+                status: 'completed',
+                customer: document.getElementById('customer').value || 'Walk-in',
+                payments: [{ method: payMethod, amount: amount }]
+            };
+            
+            // Update stock
+            cart.forEach(item => {
+                const product = PRODUCTS.find(p => p.id === item.id);
+                if (product) product.stock = Math.max(0, product.stock - item.quantity);
+            });
+            
+            ORDERS.unshift(order);
+            localStorage.setItem('pos_orders', JSON.stringify(ORDERS));
+            localStorage.setItem('pos_products', JSON.stringify(PRODUCTS));
+            
+            cart = [];
+            renderCart();
+            closePayment();
+            showReceipt(order);
+            renderProducts();
+            renderOrders();
+            renderReports();
+        }
+
+        // RECEIPT
+        function showReceipt(order) {
+            const date = new Date(order.timestamp);
+            document.getElementById('receipt-content').innerHTML = `
+                <div class="text-center border-b-2 border-dashed border-gray-700 pb-4">
+                    <h3 class="font-bold text-xl mb-1">MartPOS</h3>
+                    <p class="text-sm text-gray-400">Premium Point of Sale</p>
+                    <p class="text-xs text-gray-500 mt-2">${date.toLocaleString()}</p>
+                    <p class="text-xs text-gray-500">Order #${order.id}</p>
+                    ${order.customer ? `<p class="text-sm font-medium mt-1">Customer: ${order.customer}</p>` : ''}
+                </div>
+                <div class="space-y-2">
+                    ${order.items.map(item => `
+                        <div class="flex justify-between text-sm">
+                            <span>${item.quantity}x ${item.name}</span>
+                            <span class="font-medium">$${item.total.toFixed(2)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="border-t-2 border-dashed border-gray-700 pt-4 space-y-2">
+                    <div class="flex justify-between text-sm"><span class="text-gray-400">Subtotal</span><span>$${order.subtotal.toFixed(2)}</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-gray-400">Tax</span><span>$${order.tax.toFixed(2)}</span></div>
+                    <div class="flex justify-between font-bold text-lg pt-2 border-t border-gray-700">
+                        <span>Total</span><span class="text-emerald-500">$${order.total.toFixed(2)}</span>
+                    </div>
+                </div>
+                <div class="text-sm text-gray-400 space-y-1">
+                    <div class="flex justify-between"><span class="capitalize">${order.payments[0].method}</span><span>$${order.payments[0].amount.toFixed(2)}</span></div>
+                    ${order.change > 0 ? `<div class="flex justify-between font-medium text-emerald-500"><span>Change</span><span>$${order.change.toFixed(2)}</span></div>` : ''}
+                </div>
+                <div class="text-center pt-4 border-t-2 border-dashed border-gray-700">
+                    <p class="text-xs text-gray-500">Cashier: ${order.cashier}</p>
+                    <p class="text-xs mt-2">Thank you for shopping with us!</p>
+                </div>
+            `;
+            document.getElementById('receipt-modal').classList.remove('hidden');
+        }
+
+        function closeReceipt() {
+            document.getElementById('receipt-modal').classList.add('hidden');
+        }
+
+        // TABS
+        function showTab(tab) {
+            ['pos', 'products', 'orders', 'reports'].forEach(t => {
+                document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== tab);
+            });
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('bg-emerald-500/10', 'text-emerald-500');
+                b.classList.add('text-gray-400');
+            });
+            event.target.classList.remove('text-gray-400');
+            event.target.classList.add('bg-emerald-500/10', 'text-emerald-500');
+            
+            if (tab === 'products') renderProductTable();
+            if (tab === 'orders') renderOrders();
+            if (tab === 'reports') renderReports();
+        }
+
+        // PRODUCTS TAB
+        function renderProductTable() {
+            document.getElementById('product-table').innerHTML = PRODUCTS.map(p => {
+                const cat = CATEGORIES.find(c => c.id === p.category);
+                return `
+                    <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+                        <td class="p-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-lg flex items-center justify-center font-bold" style="background-color:${cat.color}20;color:${cat.color}">${p.name[0]}</div>
+                                <div>
+                                    <p class="font-medium text-sm">${p.name}</p>
+                                    <p class="text-xs text-gray-500">${p.barcode}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="p-4 font-bold text-emerald-500">$${p.price.toFixed(2)}</td>
+                        <td class="p-4">
+                            <span class="px-2 py-1 rounded-lg text-xs font-medium ${p.stock <= 10 ? 'bg-amber-500/10 text-amber-500' : 'bg-gray-800 text-gray-400'}">${p.stock}</span>
+                        </td>
+                        <td class="p-4">
+                            <span class="px-2 py-1 rounded-lg text-xs font-medium capitalize" style="background-color:${cat.color}20;color:${cat.color}">${p.category}</span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function showAddProduct() {
+            const name = prompt('Product name:');
+            if (!name) return;
+            const price = parseFloat(prompt('Price:') || '0');
+            const stock = parseInt(prompt('Stock:') || '0');
+            const category = prompt('Category (beverages/snacks/dairy/produce/frozen/household/personal):') || 'beverages';
+            
+            PRODUCTS.push({
+                id: Math.random().toString(36).substr(2, 9),
+                barcode: Math.random().toString().substr(2, 12),
+                name, price, category, stock, taxRate: 0.08
+            });
+            localStorage.setItem('pos_products', JSON.stringify(PRODUCTS));
+            renderProducts();
+            renderProductTable();
+        }
+
+        // ORDERS TAB
+        function renderOrders() {
+            document.getElementById('orders-table').innerHTML = ORDERS.map(o => {
+                const date = new Date(o.timestamp);
+                return `
+                    <tr class="border-b border-gray-800/50 hover:bg-gray-800/30">
+                        <td class="p-4">
+                            <p class="font-medium text-sm font-mono">#${o.id}</p>
+                            <p class="text-xs text-gray-500">${o.cashier}</p>
+                        </td>
+                        <td class="p-4 text-sm">${date.toLocaleDateString()}</td>
+                        <td class="p-4 text-right font-bold text-emerald-500">$${o.total.toFixed(2)}</td>
+                        <td class="p-4">
+                            <span class="px-2 py-1 rounded-lg text-xs font-medium capitalize ${o.status === 'completed' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500'}">${o.status}</span>
+                        </td>
+                    </tr>
+                `;
+            }).join('') || '<tr><td colspan="4" class="p-4 text-center text-gray-500">No orders yet</td></tr>';
+        }
+
+        // REPORTS
+        function renderReports() {
+            const completed = ORDERS.filter(o => o.status === 'completed');
+            const totalSales = completed.reduce((s, o) => s + o.total, 0);
+            const totalOrders = completed.length;
+            const totalItems = completed.reduce((s, o) => s + o.items.reduce((si, i) => si + i.quantity, 0), 0);
+            const avg = totalOrders > 0 ? totalSales / totalOrders : 0;
+            
+            document.getElementById('report-sales').textContent = `$${totalSales.toFixed(2)}`;
+            document.getElementById('report-orders').textContent = totalOrders;
+            document.getElementById('report-items').textContent = totalItems;
+            document.getElementById('report-avg').textContent = `$${avg.toFixed(2)}`;
+        }
+
+        // BARCODE
+        function toggleBarcode() {
+            const code = prompt('Enter barcode:');
+            if (!code) return;
+            const product = PRODUCTS.find(p => p.barcode === code);
+            if (product) {
+                addToCart(product.id);
+            } else {
+                alert('Product not found!');
+            }
+        }
+
+        // INIT
+        renderUsers();
+    </script>
+</body>
+</html>
